@@ -1,0 +1,52 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore src/Acr122uNfcReader/Acr122uNfcReader.csproj
+
+      - name: Publish self-contained single EXE
+        shell: pwsh
+        run: dotnet publish src/Acr122uNfcReader/Acr122uNfcReader.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -p:DebugSymbols=false -p:DebugType=None -o dist
+
+      - name: Verify EXE
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist/ACR122U.NFC.Reader.exe")) {
+            throw "Executável não encontrado."
+          }
+          Get-ChildItem dist
+
+      - name: Package ZIP
+        shell: pwsh
+        run: Compress-Archive -Path dist/* -DestinationPath acr122u_nfc_reader-win-x64.zip -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: acr122u_nfc_reader-win-x64
+          path: |
+            dist/ACR122U.NFC.Reader.exe
+            acr122u_nfc_reader-win-x64.zip
+          if-no-files-found: error
+          retention-days: 30
